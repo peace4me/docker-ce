@@ -30,15 +30,19 @@ import (
 
 func (l *tarexporter) Load(inTar io.ReadCloser, outStream io.Writer, quiet bool) error {
 	var progressOutput progress.Output
+	// 如果非安静模式，则把程序执行结果以进程JSON的形式输出
 	if !quiet {
 		progressOutput = streamformatter.NewJSONProgressOutput(outStream, false)
 	}
+	// 输出格式化为JSON信息
 	outStream = streamformatter.NewStdoutWriter(outStream)
 
+	// 进程当前目录的docker-import-目录设置为临时目录
 	tmpDir, err := ioutil.TempDir("", "docker-import-")
 	if err != nil {
 		return err
 	}
+	// 延迟方法 clean up操作，栈操作，先进后出，此处最后执行
 	defer os.RemoveAll(tmpDir)
 
 	if err := chrootarchive.Untar(inTar, tmpDir, nil); err != nil {

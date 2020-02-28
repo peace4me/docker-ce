@@ -35,6 +35,8 @@ func NewArchiver(idMapping *idtools.IdentityMapping) *archive.Archiver {
 // and unpacks it into the directory at `dest`.
 // The archive may be compressed with one of the following algorithms:
 //  identity (uncompressed), gzip, bzip2, xz.
+
+// 解压压缩包tarArchive到dest内，压缩包支持的算法有一致性算法/identity（未解压情况), gzip, bzip2, xz.
 func Untar(tarArchive io.Reader, dest string, options *archive.TarOptions) error {
 	return untarHandler(tarArchive, dest, options, true, dest)
 }
@@ -44,13 +46,21 @@ func Untar(tarArchive io.Reader, dest string, options *archive.TarOptions) error
 // `dest` must be a path within `root`, if it is not an error will be returned.
 //
 // `root` should set to a directory which is not controlled by any potentially
-// malicious process.
+// malicious(恶意的) process.
 //
 // This should be used to prevent a potential attacker from manipulating `dest`
 // such that it would provide access to files outside of `dest` through things
 // like symlinks. Normally `ResolveSymlinksInScope` would handle this, however
-// sanitizing symlinks in this manner is inherrently racey:
+// sanitizing(清洁消毒，清除不良影响) symlinks in this manner is inherrently(固有的/本质上的) racey(多余/不合理的):
 // ref: CVE-2018-15664
+
+// chroot作用：更改root目录。在linux系统当中，系统默认的目录结构都是"/",即是以根(root)开始的。而在使用chroot之后，可以将指定目录作为系统的根目录
+// eg.
+// cd /home/
+// chroot .
+// pwd # 结果为/，即将/home目录作为了系统的新的根目录
+// 通过这种方式，可以避免恶意程序通过软链接方式访问到dest以外的文件系统而造成潜在的攻击
+// ref: https://www.ibm.com/developerworks/cn/linux/l-cn-chroot/index.html
 func UntarWithRoot(tarArchive io.Reader, dest string, options *archive.TarOptions, root string) error {
 	return untarHandler(tarArchive, dest, options, true, root)
 }
@@ -63,6 +73,8 @@ func UntarUncompressed(tarArchive io.Reader, dest string, options *archive.TarOp
 }
 
 // Handler for teasing out the automatic decompression
+
+// 用于套取自动化解压的处理程序
 func untarHandler(tarArchive io.Reader, dest string, options *archive.TarOptions, decompress bool, root string) error {
 	if tarArchive == nil {
 		return fmt.Errorf("Empty archive")
