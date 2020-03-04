@@ -58,26 +58,39 @@ func (err ErrBlobMounted) Error() string {
 // store, a descriptor can be used to fetch, store and target any kind of
 // blob. The struct also describes the wire protocol format. Fields should
 // only be added but never changed.
+
+// Descriptor描述了目标内容。和blob存储联合使用，用于获取，存储和接触任意类型的
+// blob. 该数据结构同样描述了关联的协议格式。应该只能增加而不能修改字段。
+
+// struct格式定义
+// [golang struct 定义中json``解析说明](https://www.cnblogs.com/fengxm/p/9917686.html)
+// [Go 语言 JSON 简介](https://cizixs.com/2016/12/19/golang-json-guide/)
 type Descriptor struct {
 	// MediaType describe the type of the content. All text based formats are
 	// encoded as utf-8.
+	// 媒体类型，utf-8编码
 	MediaType string `json:"mediaType,omitempty"`
 
 	// Size in bytes of content.
+	// 内容大小，单位字节
 	Size int64 `json:"size,omitempty"`
 
 	// Digest uniquely identifies the content. A byte stream can be verified
 	// against this digest.
+	// 摘要 用于内容验证
 	Digest digest.Digest `json:"digest,omitempty"`
 
 	// URLs contains the source URLs of this content.
+	// 获取内容的url地址
 	URLs []string `json:"urls,omitempty"`
 
 	// Annotations contains arbitrary metadata relating to the targeted content.
+	// 任意和内容关联的注解
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Platform describes the platform which the image in the manifest runs on.
 	// This should only be used when referring to a manifest.
+	// 运行的平台
 	Platform *v1.Platform `json:"platform,omitempty"`
 
 	// NOTE: Before adding a field here, please ensure that all

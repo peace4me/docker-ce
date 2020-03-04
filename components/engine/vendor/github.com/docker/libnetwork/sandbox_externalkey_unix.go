@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/libnetwork/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -25,7 +24,7 @@ const (
 )
 
 // processSetKeyReexec is a private function that must be called only on an reexec path
-// It expects 3 args { [0] = "libnetwork-setkey", [1] = <container-id>, [2] = <short-controller-id> }
+// It expects 3 args { [0] = "libnetwork-setkey", [1] = <container-id>, [2] = <controller-id> }
 // It also expects specs.State as a json string in <stdin>
 // Refer to https://github.com/opencontainers/runc/pull/160/ for more information
 // The docker exec-root can be specified as "-exec-root" flag. The default value is "/run/docker".
@@ -42,14 +41,14 @@ func processSetKeyReexec() {
 	execRoot := flag.String("exec-root", defaultExecRoot, "docker exec root")
 	flag.Parse()
 
-	// expecting 3 os.Args {[0]="libnetwork-setkey", [1]=<container-id>, [2]=<short-controller-id> }
+	// expecting 3 os.Args {[0]="libnetwork-setkey", [1]=<container-id>, [2]=<controller-id> }
 	// (i.e. expecting 2 flag.Args())
 	args := flag.Args()
 	if len(args) < 2 {
 		err = fmt.Errorf("Re-exec expects 2 args (after parsing flags), received : %d", len(args))
 		return
 	}
-	containerID, shortCtlrID := args[0], args[1]
+	containerID, controllerID := args[0], args[1]
 
 	// We expect specs.State as a json string in <stdin>
 	stateBuf, err := ioutil.ReadAll(os.Stdin)
@@ -61,16 +60,16 @@ func processSetKeyReexec() {
 		return
 	}
 
-	err = SetExternalKey(shortCtlrID, containerID, fmt.Sprintf("/proc/%d/ns/net", state.Pid), *execRoot)
+	err = SetExternalKey(controllerID, containerID, fmt.Sprintf("/proc/%d/ns/net", state.Pid), *execRoot)
 }
 
 // SetExternalKey provides a convenient way to set an External key to a sandbox
-func SetExternalKey(shortCtlrID string, containerID string, key string, execRoot string) error {
+func SetExternalKey(controllerID string, containerID string, key string, execRoot string) error {
 	keyData := setKeyData{
 		ContainerID: containerID,
 		Key:         key}
 
-	uds := filepath.Join(execRoot, execSubdir, shortCtlrID+".sock")
+	uds := filepath.Join(execRoot, execSubdir, controllerID+".sock")
 	c, err := net.Dial("unix", uds)
 	if err != nil {
 		return err
@@ -121,8 +120,7 @@ func (c *controller) startExternalKeyListener() error {
 	if err := os.MkdirAll(udsBase, 0600); err != nil {
 		return err
 	}
-	shortCtlrID := stringid.TruncateID(c.id)
-	uds := filepath.Join(udsBase, shortCtlrID+".sock")
+	uds := filepath.Join(udsBase, c.id+".sock")
 	l, err := net.Listen("unix", uds)
 	if err != nil {
 		return err

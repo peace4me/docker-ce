@@ -55,14 +55,7 @@ func (d *driver) initStore(option map[string]interface{}) error {
 			return types.InternalErrorf("ipvlan driver failed to initialize data store: %v", err)
 		}
 
-		err = d.populateNetworks()
-		if err != nil {
-			return err
-		}
-		err = d.populateEndpoints()
-		if err != nil {
-			return err
-		}
+		return d.populateNetworks()
 	}
 
 	return nil
@@ -80,7 +73,7 @@ func (d *driver) populateNetworks() error {
 	}
 	for _, kvo := range kvol {
 		config := kvo.(*configuration)
-		if _, err = d.createNetwork(config); err != nil {
+		if err = d.createNetwork(config); err != nil {
 			logrus.Warnf("could not create ipvlan network for id %s from persistent state", config.ID)
 		}
 	}

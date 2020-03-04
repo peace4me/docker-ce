@@ -1054,7 +1054,7 @@ func (n *network) delete(force bool, rmLBEndpoint bool) error {
 					t.Name(), n.Name(), err)
 			}
 		} else {
-			logrus.Warnf("Could not find configuration network %q during removal of network %q", n.configFrom, n.Name())
+			logrus.Warnf("Could not find configuration network %q during removal of network %q", n.configOnly, n.Name())
 		}
 	}
 
@@ -1381,18 +1381,14 @@ func delIPToName(ipMap setmatrix.SetMatrix, name, serviceID string, ip net.IP) {
 }
 
 func addNameToIP(svcMap setmatrix.SetMatrix, name, serviceID string, epIP net.IP) {
-	// Since DNS name resolution is case-insensitive, Use the lower-case form
-	// of the name as the key into svcMap
-	lowerCaseName := strings.ToLower(name)
-	svcMap.Insert(lowerCaseName, svcMapEntry{
+	svcMap.Insert(name, svcMapEntry{
 		ip:        epIP.String(),
 		serviceID: serviceID,
 	})
 }
 
 func delNameToIP(svcMap setmatrix.SetMatrix, name, serviceID string, epIP net.IP) {
-	lowerCaseName := strings.ToLower(name)
-	svcMap.Remove(lowerCaseName, svcMapEntry{
+	svcMap.Remove(name, svcMapEntry{
 		ip:        epIP.String(),
 		serviceID: serviceID,
 	})
@@ -1938,22 +1934,6 @@ func (n *network) TableEventRegister(tableName string, objType driverapi.ObjectT
 	return nil
 }
 
-func (n *network) UpdateIpamConfig(ipV4Data []driverapi.IPAMData) {
-
-	ipamV4Config := make([]*IpamConf, len(ipV4Data))
-
-	for i, data := range ipV4Data {
-		ic := &IpamConf{}
-		ic.PreferredPool = data.Pool.String()
-		ic.Gateway = data.Gateway.IP.String()
-		ipamV4Config[i] = ic
-	}
-
-	n.Lock()
-	defer n.Unlock()
-	n.ipamV4Config = ipamV4Config
-}
-
 // Special drivers are ones which do not need to perform any network plumbing
 func (n *network) hasSpecialDriver() bool {
 	return n.Type() == "host" || n.Type() == "null"
@@ -1976,7 +1956,6 @@ func (n *network) ResolveName(req string, ipType int) ([]net.IP, bool) {
 	}
 
 	req = strings.TrimSuffix(req, ".")
-	req = strings.ToLower(req)
 	ipSet, ok := sr.svcMap.Get(req)
 
 	if ipType == types.IPv6 {

@@ -76,6 +76,20 @@ func setLinux(s *Spec) {
 	}
 }
 
+// nolint
+func setResources(s *Spec) {
+	if s.Linux != nil {
+		if s.Linux.Resources == nil {
+			s.Linux.Resources = &specs.LinuxResources{}
+		}
+	}
+	if s.Windows != nil {
+		if s.Windows.Resources == nil {
+			s.Windows.Resources = &specs.WindowsResources{}
+		}
+	}
+}
+
 // setCapabilities sets Linux Capabilities to empty if unset
 func setCapabilities(s *Spec) {
 	setProcess(s)
@@ -104,7 +118,7 @@ func WithDefaultSpecForPlatform(platform string) SpecOpts {
 	}
 }
 
-// WithSpecFromBytes loads the the spec from the provided byte slice.
+// WithSpecFromBytes loads the spec from the provided byte slice.
 func WithSpecFromBytes(p []byte) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		*s = Spec{} // make sure spec is cleared.
@@ -135,6 +149,13 @@ func WithEnv(environmentVariables []string) SpecOpts {
 		}
 		return nil
 	}
+}
+
+// WithDefaultPathEnv sets the $PATH environment variable to the
+// default PATH defined in this package.
+func WithDefaultPathEnv(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, defaultUnixEnv)
+	return nil
 }
 
 // replaceOrAppendEnvValues returns the defaults with the overrides either
@@ -312,7 +333,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 		setProcess(s)
 		if s.Linux != nil {
-			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, config.Env)
+			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
 			cmd := config.Cmd
 			if len(args) > 0 {
 				cmd = args
@@ -334,7 +355,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			// even if there is no specified user in the image config
 			return WithAdditionalGIDs("root")(ctx, client, c, s)
 		} else if s.Windows != nil {
-			s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, config.Env)
+			s.Process.Env = replaceOrAppendEnvValues(config.Env, s.Process.Env)
 			cmd := config.Cmd
 			if len(args) > 0 {
 				cmd = args
@@ -607,7 +628,7 @@ func WithUserID(uid uint32) SpecOpts {
 }
 
 // WithUsername sets the correct UID and GID for the container
-// based on the the image's /etc/passwd contents. If /etc/passwd
+// based on the image's /etc/passwd contents. If /etc/passwd
 // does not exist, or the username is not found in /etc/passwd,
 // it returns error.
 func WithUsername(username string) SpecOpts {
@@ -1136,6 +1157,42 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 		for k, v := range annotations {
 			s.Annotations[k] = v
 		}
+		return nil
+	}
+}
+
+// WithLinuxDevices adds the provided linux devices to the spec
+func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		s.Linux.Devices = append(s.Linux.Devices, devices...)
+		return nil
+	}
+}
+
+var ErrNotADevice = errors.New("not a device node")
+
+// WithLinuxDevice adds the device specified by path to the spec
+func WithLinuxDevice(path, permissions string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		setResources(s)
+
+		dev, err := deviceFromPath(path, permissions)
+		if err != nil {
+			return err
+		}
+
+		s.Linux.Devices = append(s.Linux.Devices, *dev)
+
+		s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
+			Type:   dev.Type,
+			Allow:  true,
+			Major:  &dev.Major,
+			Minor:  &dev.Minor,
+			Access: permissions,
+		})
+
 		return nil
 	}
 }

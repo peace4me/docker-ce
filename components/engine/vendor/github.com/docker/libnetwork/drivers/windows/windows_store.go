@@ -61,7 +61,9 @@ func (d *driver) populateNetworks() error {
 		if ncfg.Type != d.name {
 			continue
 		}
-		d.createNetwork(ncfg)
+		if err = d.createNetwork(ncfg); err != nil {
+			logrus.Warnf("could not create windows network for id %s hnsid %s while booting up from persistent state: %v", ncfg.ID, ncfg.HnsID, err)
+		}
 		logrus.Debugf("Network  %v (%.7s) restored", d.name, ncfg.ID)
 	}
 
